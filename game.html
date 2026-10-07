@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a3d2e">
+<title>斗地主</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(160deg, #1a3d2e 0%, #0d2419 100%);
+    color:#fff; min-height:100vh; overflow:hidden; user-select:none;
+  }
+  #login-screen {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-height:100vh; padding:30px 20px;
+  }
+  #login-screen h1 { font-size:30px; margin-bottom:8px; letter-spacing:3px; }
+  #login-screen .subtitle { color:#a8d5b8; font-size:14px; margin-bottom:36px; }
+  .field-label { font-size:13px; color:#a8d5b8; margin-bottom:8px; align-self:flex-start; }
+  #username-input {
+    width:100%; max-width:320px; padding:14px 16px; border-radius:12px;
+    border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.08);
+    color:#fff; font-size:16px; outline:none; margin-bottom:28px;
+  }
+  #username-input::placeholder { color:rgba(255,255,255,0.35); }
+  .avatar-grid {
+    display:grid; grid-template-columns:repeat(6,1fr); gap:10px;
+    width:100%; max-width:320px; margin-bottom:36px;
+  }
+  .avatar-option {
+    aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+    font-size:26px; border-radius:12px; background:rgba(255,255,255,0.08);
+    border:2px solid transparent; cursor:pointer; transition:all 0.15s;
+  }
+  .avatar-option.selected {
+    border-color:#7dd8a3; background:rgba(125,216,163,0.25); transform:scale(1.08);
+  }
+  .btn-primary {
+    width:100%; max-width:320px; padding:16px; border-radius:12px; border:none;
+    background:linear-gradient(90deg,#7dd8a3,#4ec48a); color:#06341f;
+    font-size:17px; font-weight:700; cursor:pointer; letter-spacing:1px;
+  }
+
+  #bid-modal {
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85);
+    z-index:100; flex-direction:column; align-items:center; justify-content:center;
+    padding:30px;
+  }
+  #bid-modal h2 { font-size:22px; margin-bottom:12px; }
+  #bid-modal p { color:#a8d5b8; font-size:14px; margin-bottom:28px; text-align:center; }
+  .bid-buttons { display:flex; gap:14px; }
+  .btn-bid {
+    padding:14px 28px; border-radius:12px; border:none;
+    font-size:16px; font-weight:700; cursor:pointer;
+  }
+  .btn-bid.yes { background:linear-gradient(90deg,#7dd8a3,#4ec48a); color:#06341f; }
+  .btn-bid.no { background:rgba(255,255,255,0.15); color:#fff; }
+
+  #game-screen { display:none; flex-direction:column; height:100vh; padding:8px; }
+
+  .top-bar {
+    display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;
+    padding:0 4px;
+  }
+  .user-info {
+    display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.08);
+    padding:6px 12px; border-radius:999px; font-size:13px;
+  }
+  .btn-small {
+    background:rgba(255,255,255,0.1); border:none; color:#fff;
+    padding:6px 12px; border-radius:999px; font-size:12px; cursor:pointer;
+  }
+
+  .ai-area {
+    display:flex; justify-content:space-between; padding:4px 8px; margin-bottom:8px;
+  }
+  .ai-player { text-align:center; flex:1; }
+  .ai-avatar { font-size:22px; }
+  .ai-name { font-size:12px; color:#a8d5b8; }
+  .ai-count {
+    display:inline-block; background:rgba(255,255,255,0.15); color:#ffd166;
+    font-size:11px; padding:2px 8px; border-radius:999px; margin-top:2px;
+  }
+  .ai-played {
+    display:flex; justify-content:center; gap:2px; margin-top:4px;
+    min-height:44px; align-items:center; flex-wrap:wrap;
+  }
+  .landlord-badge {
+    display:inline-block; background:#ff9f1a; color:#4a2c00;
+    font-size:10px; padding:1px 6px; border-radius:999px; margin-left:4px;
+    font-weight:700;
+  }
+
+  .play-area {
+    flex:1; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:6px; padding:8px 0; min-height:120px;
+  }
+  .play-label { font-size:12px; color:#a8d5b8; }
+  .last-play {
+    display:flex; justify-content:center; gap:4px; flex-wrap:wrap;
+    min-height:60px; align-items:center;
+  }
+  .pass-text { color:#ff9f9f; font-size:14px; font-weight:600; }
+
+  .card {
+    width:42px; height:60px; border-radius:6px; background:#fff; color:#222;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-weight:700; box-shadow:0 2px 6px rgba(0,0,0,0.3); flex-shrink:0;
+    position:relative;
+  }
+  .card.red { color:#d63031; }
+  .card.joker-red { color:#d63031; }
+  .card.joker-black { color:#222; }
+  .card .rank { font-size:15px; line-height:1; }
+  .card .suit { font-size:14px; line-height:1.2; }
+  .card.joker .rank { font-size:13px; }
+  .card.joker .suit { font-size:18px; }
+  .card.mini { width:32px; height:46px; }
+  .card.mini .rank { font-size:12px; }
+  .card.mini .suit { font-size:11px; }
+
+  .my-hand {
+    display:flex; justify-content:center; flex-wrap:wrap; gap:4px;
+    padding:6px 4px; min-height:70px; align-items:flex-end;
+    margin-bottom:6px;
+  }
+  .my-hand .card {
+    transition:transform 0.15s, margin 0.15s;
+    cursor:pointer;
+    margin-left:-14px;
+  }
+  .my-hand .card:first-child { margin-left:0; }
+  .my-hand .card.selected {
+    transform:translateY(-14px);
+    border:2px solid #ffd166;
+    z-index:10;
+  }
+
+  .action-bar {
+    display:flex; gap:8px; padding:4px 8px 8px;
+  }
+  .btn-action {
+    flex:1; padding:14px; border-radius:10px; border:none;
+    font-size:14px; font-weight:700; cursor:pointer; transition:all 0.15s;
+  }
+  .btn-pass { background:linear-gradient(90deg,#6cb2ff,#4a8cff); color:#fff; }
+  .btn-hint { background:linear-gradient(90deg,#ffd166,#ffb84d); color:#4a2c00; }
+  .btn-play { background:linear-gradient(90deg,#7dd8a3,#4ec48a); color:#06341f; }
+  .btn-action:disabled { opacity:0.35; cursor:not-allowed; }
+  .btn-action:active:not(:disabled) { transform:scale(0.97); }
+
+  .message {
+    text-align:center; font-size:14px; color:#ffd166;
+    margin:4px 0; min-height:20px; font-weight:600;
+  }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <h1>🃏 斗地主</h1>
+  <p class="subtitle">单机版 · 1 玩家 vs 2 AI</p>
+  <div class="field-label">你的昵称</div>
+  <input id="username-input" type="text" placeholder="输入昵称..." maxlength="12">
+  <div class="field-label">选择你的形象</div>
+  <div class="avatar-grid" id="avatar-grid"></div>
+  <button class="btn-primary" id="btn-login">进入游戏</button>
+</div>
+
+<div id="bid-modal">
+  <h2>🤔 叫地主</h2>
+  <p id="bid-tip">你要叫地主吗？</p>
+  <div class="bid-buttons">
+    <button class="btn-bid no" id="btn-bid-no">不叫</button>
+    <button class="btn-bid yes" id="btn-bid-yes">叫地主</button>
+  </div>
+</div>
+
+<div id="game-screen">
+  <div class="top-bar">
+    <div class="user-info">
+      <span id="display-avatar">🐺</span>
+      <span id="display-name">玩家</span>
+      <span class="landlord-badge" id="my-badge" style="display:none;">地主</span>
+    </div>
+    <button class="btn-small" id="btn-logout">退出</button>
+  </div>
+
+  <div class="ai-area">
+    <div class="ai-player">
+      <div class="ai-avatar">🤖</div>
+      <div class="ai-name">左家 <span class="landlord-badge" id="ai1-badge" style="display:none;">地主</span></div>
+      <div class="ai-count" id="ai1-count">0 张</div>
+      <div class="ai-played" id="ai1-played"></div>
+    </div>
+    <div class="ai-player">
+      <div class="ai-avatar">🤖</div>
+      <div class="ai-name">右家 <span class="landlord-badge" id="ai2-badge" style="display:none;">地主</span></div>
+      <div class="ai-count" id="ai2-count">0 张</div>
+      <div class="ai-played" id="ai2-played"></div>
+    </div>
+  </div>
+
+  <div class="play-area">
+    <div class="play-label" id="last-play-label">上一手</div>
+    <div class="last-play" id="last-play"></div>
+  </div>
+
+  <div class="message" id="message">准备开始...</div>
+
+  <div class="my-hand" id="my-hand"></div>
+
+  <div class="action-bar">
+    <button class="btn-action btn-pass" id="btn-pass" disabled>不要</button>
+    <button class="btn-action btn-hint" id="btn-hint" disabled>提示</button>
+    <button class="btn-action btn-play" id="btn-play" disabled>出牌</button>
+    <button class="btn-action btn-play" id="btn-start" style="flex:2;">开始游戏</button>
+  </div>
+</div>
+
+<script>
+const SUITS = ['♠','♥','♦','♣'];
+const RANKS = ['3','4','5','6','7','8','9','10','J','Q','K','A','2','小王','大王'];
+
+function cardValue(card) {
+  if (card.rank === '小王') return 16;
+  if (card.rank === '大王') return 17;
+  return RANKS.indexOf(card.rank) + 3;
+}
+
+const state = {
+  user: null,
+  hands: { player: [], ai1: [], ai2: [] },
+  lastPlay: null,
+  currentTurn: 'player',
+  selected: new Set(),
+  playing: false,
+  landlord: null,
+  passCount: 0,
+  bidPhase: false
+};
+
+const AVATARS = ['🐺','🦊','🐯','🐼','🦁','🐸','🐵','🐰','🐻','🐨','🦉','🐲'];
+
+// ==================== 登录 ====================
+function initLogin() {
+  const grid = document.getElementById('avatar-grid');
+  AVATARS.forEach((a, i) => {
+    const d = document.createElement('div');
+    d.className = 'avatar-option' + (i === 0 ? ' selected' : '');
+    d.textContent = a;
+    d.onclick = () => {
+      document.querySelectorAll('.avatar-option').forEach(x => x.classList.remove('selected'));
+      d.classList.add('selected');
+    };
+    grid.appendChild(d);
+  });
+
+  document.getElementById('btn-login').onclick = () => {
+    const name = document.getElementById('username-input').value.trim() || '玩家';
+    const avatar = document.querySelector('.avatar-option.selected').textContent;
+    state.user = { name, avatar };
+    localStorage.setItem('ddz_user', JSON.stringify(state.user));
+    enterGame();
+  };
+}
+
+function enterGame() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('game-screen').style.display = 'flex';
+  document.getElementById('display-avatar').textContent = state.user.avatar;
+  document.getElementById('display-name').textContent = state.user.name;
+  document.getElementById('btn-start').onclick = startGame;
+}
+
+// ==================== 发牌 ====================
+function newDeck() {
+  const deck = [];
+  for (const r of RANKS) {
+    if (r === '小王' || r === '大王') {
+      deck.push({ rank: r, suit: '🃏', isJoker: true });
+    } else {
+      for (const s of SUITS) deck.push({ rank: r, suit: s });
+    }
+  }
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+function sortHand(hand) {
+  return hand.sort((a, b) => cardValue(a) - cardValue(b) || SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit));
+}
+
+let savedDeck = null;
+let savedBottom = null;
+
+// ==================== 开局 ====================
+function startGame() {
+  const deck = newDeck();
+  savedDeck = deck.slice(0, 51);
+  savedBottom = deck.slice(51, 54);
+
+  state.hands.player = [];
+  state.hands.ai1 = [];
+  state.hands.ai2 = [];
+  state.lastPlay = null;
+  state.selected.clear();
+  state.playing = false;
+  state.passCount = 0;
+  state.landlord = null;
+  state.bidPhase = true;
+
+  document.getElementById('ai1-played').innerHTML = '';
+  document.getElementById('ai2-played').innerHTML = '';
+  document.getElementById('last-play').innerHTML = '';
+  document.getElementById('last-play-label').textContent = '上一手';
+  document.getElementById('message').textContent = '发牌中...';
+  document.getElementById('my-badge').style.display = 'none';
+  document.getElementById('ai1-badge').style.display = 'none';
+  document.getElementById('ai2-badge').style.display = 'none';
+  document.getElementById('btn-start').style.display = 'none';
+
+  renderAll();
+  enableMyTurn(false);
+
+  let idx = 0;
+  const total = 51;
+  const timer = setInterval(() => {
+    if (idx >= total) {
+      clearInterval(timer);
+      state.hands.player = sortHand(state.hands.player);
+      state.hands.ai1 = sortHand(state.hands.ai1);
+      state.hands.ai2 = sortHand(state.hands.ai2);
+      renderAll();
+      document.getElementById('message').textContent = '叫地主阶段';
+      setTimeout(showBidModal, 400);
+      return;
+    }
+    const who = idx % 3;
+    const card = savedDeck[idx];
+    if (who === 0) state.hands.player.push(card);
+    else if (who === 1) state.hands.ai1.push(card);
+    else state.hands.ai2.push(card);
+
+    if (who === 0) renderMyHand();
+    renderAICounts();
+    idx++;
+  }, 40);
+}
+
+function showBidModal() {
+  document.getElementById('bid-tip').textContent = '你要叫地主吗？';
+  document.getElementById('bid-modal').style.display = 'flex';
+}
+
+function resolveBid(playerWantsLandlord) {
+  document.getElementById('bid-modal').style.display = 'none';
+  state.bidPhase = false;
+
+  let landlord = null;
+  if (playerWantsLandlord) {
+    landlord = 'player';
+  } else {
+    const ai1Wants = Math.random() < 0.4;
+    const ai2Wants = Math.random() < 0.4;
+    if (ai1Wants) landlord = 'ai1';
+    else if (ai2Wants) landlord = 'ai2';
+    else landlord = 'ai1';
+  }
+
+  state.landlord = landlord;
+  state.hands[landlord] = sortHand([...state.hands[landlord], ...savedBottom]);
+
+  if (landlord === 'player') document.getElementById('my-badge').style.display = 'inline-block';
+  else if (landlord === 'ai1') document.getElementById('ai1-badge').style.display = 'inline-block';
+  else document.getElementById('ai2-badge').style.display = 'inline-block';
+
+  const who = landlord === 'player' ? '你' : (landlord === 'ai1' ? '左家' : '右家');
+  document.getElementById('message').textContent = who + ' 是地主';
+
+  state.playing = true;
+  state.currentTurn = landlord;
+  renderAll();
+
+  if (landlord === 'player') {
+    enableMyTurn(true);
+  } else {
+    enableMyTurn(false);
+    setTimeout(aiPlay, 900);
+  }
+}
+
+// ==================== 渲染 ====================
+function renderCard(card, mini = false) {
+  const d = document.createElement('div');
+  d.className = 'card' + (mini ? ' mini' : '');
+
+  if (card.isJoker) {
+    // 大小王
+    d.classList.add('joker');
+    if (card.rank === '大王') d.classList.add('joker-red');
+    else d.classList.add('joker-black');
+    const label = card.rank === '大王' ? '大' : '小';
+    d.innerHTML = `<div class="rank">${label}</div><div class="suit">🃏</div>`;
+  } else {
+    if (['♥','♦'].includes(card.suit)) d.classList.add('red');
+    d.innerHTML = `<div class="rank">${card.rank}</div><div class="suit">${card.suit}</div>`;
+  }
+  return d;
+}
+
+function renderAll() {
+  renderMyHand();
+  renderLastPlay();
+  renderAICounts();
+}
+
+function renderMyHand() {
+  const el = document.getElementById('my-hand');
+  el.innerHTML = '';
+  state.hands.player.forEach((card, idx) => {
+    const d = renderCard(card);
+    if (state.selected.has(idx)) d.classList.add('selected');
+    d.onclick = () => toggleSelect(idx);
+    el.appendChild(d);
+  });
+}
+
+function renderLastPlay() {
+  const el = document.getElementById('last-play');
+  const label = document.getElementById('last-play-label');
+  el.innerHTML = '';
+  if (!state.lastPlay) {
+    label.textContent = '上一手';
+    el.innerHTML = '<span style="color:#666;font-size:13px;">—</span>';
+    return;
+  }
+  const who = state.lastPlay.who === 'player' ? '你' :
+              state.lastPlay.who === 'ai1' ? '左家' : '右家';
+  label.textContent = who + ' 出牌';
+  if (state.lastPlay.pass) {
+    el.innerHTML = '<span class="pass-text">不要</span>';
+    return;
+  }
+  state.lastPlay.cards.forEach(c => el.appendChild(renderCard(c, true)));
+}
+
+function renderAICounts() {
+  document.getElementById('ai1-count').textContent = state.hands.ai1.length + ' 张';
+  document.getElementById('ai2-count').textContent = state.hands.ai2.length + ' 张';
+}
+
+function toggleSelect(idx) {
+  if (!state.playing || state.currentTurn !== 'player' || state.bidPhase) return;
+  if (state.selected.has(idx)) state.selected.delete(idx);
+  else state.selected.add(idx);
+  renderMyHand();
+  validateSelection();
+}
+
+// ==================== 牌型判断 ====================
+function parsePlay(cards) {
+  if (cards.length === 0) return null;
+  const values = cards.map(cardValue).sort((a,b) => a-b);
+  const counts = {};
+  values.forEach(v => counts[v] = (counts[v] || 0) + 1);
+  const keys = Object.keys(counts).map(Number).sort((a,b) => a-b);
+  const countValues = Object.values(counts).sort((a,b) => a-b);
+
+  // 王炸
+  if (cards.length === 2 && values.includes(16) && values.includes(17)) {
+    return { type: 'rocket', value: 100 };
+  }
+  if (cards.length === 1) return { type: 'single', value: values[0] };
+  if (cards.length === 2 && countValues[0] === 2 && keys.length === 1) {
+    return { type: 'pair', value: values[0] };
+  }
+  if (cards.length === 3 && countValues[0] === 3 && keys.length === 1) {
+    return { type: 'triple', value: values[0] };
+  }
+  if (cards.length === 4 && countValues[0] === 4 && keys.length === 1) {
+    return { type: 'bomb', value: values[0] };
+  }
+  if (cards.length === 4 && countValues[0] === 1 && countValues[1] === 3) {
+    const tripleValue = Number(Object.keys(counts).find(k => counts[k] === 3));
+    return { type: 'triple_single', value: tripleValue };
+  }
+  if (cards.length === 5 && countValues[0] === 2 && countValues[1] === 3) {
+    const tripleValue = Number(Object.keys(counts).find(k => counts[k] === 3));
+    return { type: 'triple_pair', value: tripleValue };
+  }
+  if (cards.length >= 5 && keys.length === cards.length && keys[keys.length-1] < 15) {
+    if (keys[keys.length-1] - keys[0] === keys.length - 1) {
+      return { type: 'straight', value: keys[keys.length-1], length: keys.length };
+    }
+  }
+  if (cards.length >= 6 && cards.length % 2 === 0 && countValues.every(c => c === 2)) {
+    if (keys[keys.length-1] < 15 && keys[keys.length-1] - keys[0] === keys.length - 1) {
+      return { type: 'straight_pair', value: keys[keys.length-1], length: keys.length };
+    }
+  }
+  if (cards.length >= 6 && cards.length % 3 === 0 && countValues.every(c => c === 3)) {
+    if (keys[keys.length-1] < 15 && keys[keys.length-1] - keys[0] === keys.length - 1) {
+      return { type: 'plane', value: keys[keys.length-1], length: keys.length };
+    }
+  }
+  if (cards.length >= 8 && cards.length % 4 === 0) {
+    const n = cards.length / 4;
+    const triples = keys.filter(k => counts[k] === 3);
+    const singles = keys.filter(k => counts[k] === 1);
+    if (triples.length === n && singles.length === n && triples[triples.length-1] < 15 &&
+        triples[triples.length-1] - triples[0] === triples.length - 1) {
+      return { type: 'plane_single', value: triples[triples.length-1], length: n };
+    }
+  }
+  if (cards.length >= 10 && cards.length % 5 === 0) {
+    const n = cards.length / 5;
+    const triples = keys.filter(k => counts[k] === 3);
+    const pairs = keys.filter(k => counts[k] === 2);
+    if (triples.length === n && pairs.length === n && triples[triples.length-1] < 15 &&
+        triples[triples.length-1] - triples[0] === triples.length - 1) {
+      return { type: 'plane_pair', value: triples[triples.length-1], length: n };
+    }
+  }
+  return null;
+}
+
+function canBeat(newPlay, lastPlay) {
+  if (!lastPlay || lastPlay.pass) return true;
+  if (!newPlay) return false;
+  if (newPlay.type === 'rocket') return true;
+  if (lastPlay.type === 'rocket') return false;
+  if (newPlay.type === 'bomb') {
+    if (lastPlay.type !== 'bomb') return true;
+    return newPlay.value > lastPlay.value;
+  }
+  if (lastPlay.type === 'bomb') return false;
+  if (newPlay.type !== lastPlay.type) return false;
+  if (newPlay.length && newPlay.length !== lastPlay.length) return false;
+  return newPlay.value > lastPlay.value;
+}
+
+// ==================== 按钮控制 ====================
+function enableMyTurn(enabled) {
+  const btnPass = document.getElementById('btn-pass');
+  const btnPlay = document.getElementById('btn-play');
+  const btnHint = document.getElementById('btn-hint');
+  const btnStart = document.getElementById('btn-start');
+  if (btnStart) btnStart.style.display = 'none';
+
+  if (!enabled) {
+    btnPass.disabled = true;
+    btnPlay.disabled = true;
+    btnHint.disabled = true;
+    return;
+  }
+
+  const cannotPass = !state.lastPlay || state.lastPlay.who === 'player';
+  btnPass.disabled = cannotPass;
+  btnPlay.disabled = true;
+  btnHint.disabled = false;
+  validateSelection();
+}
+
+function validateSelection() {
+  const btnPlay = document.getElementById('btn-play');
+  if (state.currentTurn !== 'player' || !state.playing) {
+    btnPlay.disabled = true;
+    return;
+  }
+  const cards = [...state.selected].map(i => state.hands.player[i]);
+  if (cards.length === 0) { btnPlay.disabled = true; return; }
+  const play = parsePlay(cards);
+  if (!play) { btnPlay.disabled = true; return; }
+  btnPlay.disabled = !canBeat(play, state.lastPlay);
+}
+
+// ==================== 出牌 ====================
+function playSelected() {
+  if (state.currentTurn !== 'player') return;
+  if (state.selected.size === 0) return;
+
+  const indices = [...state.selected].sort((a,b) => b-a);
+  const cards = indices.map(i => state.hands.player[i]);
+  const play = parsePlay(cards);
+
+  if (!play) { alert('牌型不合法！'); return; }
+  if (!canBeat(play, state.lastPlay)) { alert('压不过上一手！'); return; }
+
+  indices.forEach(i => state.hands.player.splice(i, 1));
+
+  state.lastPlay = { who: 'player', cards, ...play };
+  state.selected.clear();
+  state.passCount = 0;
+
+  document.getElementById('message').textContent = '你出了 ' + cards.length + ' 张';
+  renderAll();
+
+  if (state.hands.player.length === 0) { endGame('你赢了！🎉'); return; }
+  state.currentTurn = 'ai1';
+  enableMyTurn(false);
+  setTimeout(aiPlay, 900);
+}
+
+function passTurn() {
+  if (state.currentTurn !== 'player') return;
+  if (!state.lastPlay || state.lastPlay.who === 'player') return;
+  state.lastPlay = { who: 'player', pass: true };
+  state.passCount++;
+  state.selected.clear();
+  renderAll();
+  document.getElementById('message').textContent = '你选择不要';
+  state.currentTurn = 'ai1';
+  enableMyTurn(false);
+  setTimeout(aiPlay, 900);
+}
+
+// ==================== 提示 ====================
+function hint() {
+  if (state.currentTurn !== 'player' || !state.playing) return;
+  const hand = state.hands.player;
+  if (hand.length === 0) return;
+
+  if (!state.lastPlay || state.lastPlay.pass || state.lastPlay.who === 'player') {
+    const combo = findBestCombo(hand);
+    if (combo) {
+      state.selected = new Set(combo.indices);
+      renderMyHand();
+      validateSelection();
+      return;
+    }
+    let minIdx = 0;
+    for (let i = 1; i < hand.length; i++) {
+      if (cardValue(hand[i]) < cardValue(hand[minIdx])) minIdx = i;
+    }
+    state.selected = new Set([minIdx]);
+    renderMyHand();
+    validateSelection();
+    return;
+  }
+
+  const play = findSmallestBeat(hand, state.lastPlay);
+  if (!play) {
+    document.getElementById('message').textContent = '没有能压过的牌，建议不要';
+    return;
+  }
+  state.selected = new Set(play.indices);
+  renderMyHand();
+  validateSelection();
+}
+
+function findSmallestBeat(hand, lastPlay) {
+  const needType = lastPlay.type;
+  const needValue = lastPlay.value;
+
+  if (needType === 'single') {
+    let best = -1;
+    for (let i = 0; i < hand.length; i++) {
+      const v = cardValue(hand[i]);
+      if (v > needValue && (best === -1 || v < cardValue(hand[best]))) best = i;
+    }
+    if (best >= 0) return { indices: [best] };
+  }
+
+  if (needType === 'pair') {
+    let bestPair = null;
+    for (let i = 0; i < hand.length; i++) {
+      for (let j = i+1; j < hand.length; j++) {
+        if (hand[i].rank === hand[j].rank) {
+          const v = cardValue(hand[i]);
+          if (v > needValue && (!bestPair || v < cardValue(hand[bestPair[0]]))) {
+            bestPair = [i, j];
+          }
+        }
+      }
+    }
+    if (bestPair) return { indices: bestPair };
+  }
+
+  if (needType === 'triple') {
+    for (let i = 0; i < hand.length; i++) {
+      for (let j = i+1; j < hand.length; j++) {
+        for (let k = j+1; k < hand.length; k++) {
+          if (hand[i].rank === hand[j].rank && hand[j].rank === hand[k].rank &&
+              cardValue(hand[i]) > needValue) {
+            return { indices: [i, j, k] };
+          }
+        }
+      }
+    }
+  }
+
+  if (needType !== 'bomb' && needType !== 'rocket') {
+    for (let i = 0; i < hand.length; i++) {
+      for (let j = i+1; j < hand.length; j++) {
+        for (let k = j+1; k < hand.length; k++) {
+          for (let l = k+1; l < hand.length; l++) {
+            if (hand[i].rank === hand[j].rank && hand[j].rank === hand[k].rank && hand[k].rank === hand[l].rank) {
+              return { indices: [i, j, k, l] };
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const smallJoker = hand.findIndex(c => c.rank === '小王');
+  const bigJoker = hand.findIndex(c => c.rank === '大王');
+  if (smallJoker >= 0 && bigJoker >= 0) {
+    return { indices: [smallJoker, bigJoker] };
+  }
+
+  return null;
+}
+
+// ==================== AI ====================
+function aiPlay() {
+  const aiKey = state.currentTurn;
+  if (aiKey === 'player') return;
+  const hand = state.hands[aiKey];
+
+  if (hand.length === 0) { endGame('你输了 😢'); return; }
+
+  const isLandlord = (aiKey === state.landlord);
+  const teammate = aiKey === 'ai1' ? 'ai2' : 'ai1';
+
+  if (!isLandlord && state.lastPlay && state.lastPlay.who === teammate && !state.lastPlay.pass) {
+    passAI(aiKey);
+    return;
+  }
+
+  const opponentKey = isLandlord ? 'player' : state.landlord;
+  const opponentCards = state.hands[opponentKey];
+  const mustBlock = opponentCards.length === 1 && opponentKey !== aiKey;
+
+  const play = findPlayable(hand, state.lastPlay, { isLandlord, mustBlock });
+
+  if (play) {
+    const indices = play.indices.sort((a,b) => b-a);
+    const cards = indices.map(i => hand[i]);
+    indices.forEach(i => hand.splice(i, 1));
+
+    state.lastPlay = { who: aiKey, cards, ...play.play };
+    state.passCount = 0;
+
+    renderAIplayed(aiKey, cards);
+    document.getElementById('message').textContent =
+      (aiKey === 'ai1' ? '左家' : '右家') + ' 出了 ' + cards.length + ' 张';
+    renderAICounts();
+    renderLastPlay();
+
+    if (hand.length === 0) { endGame('你输了 😢'); return; }
+  } else {
+    passAI(aiKey);
+    return;
+  }
+  nextTurn();
+}
+
+function passAI(aiKey) {
+  state.lastPlay = { who: aiKey, pass: true };
+  state.passCount++;
+  renderAIplayed(aiKey, []);
+  document.getElementById('message').textContent =
+    (aiKey === 'ai1' ? '左家' : '右家') + ' 不要';
+  renderLastPlay();
+  nextTurn();
+}
+
+function renderAIplayed(aiKey, cards) {
+  const el = document.getElementById(aiKey === 'ai1' ? 'ai1-played' : 'ai2-played');
+  el.innerHTML = '';
+  if (cards.length === 0) {
+    el.innerHTML = '<span style="color:#ff9f9f;font-size:12px;">不要</span>';
+    return;
+  }
+  cards.forEach(c => el.appendChild(renderCard(c, true)));
+}
+
+function nextTurn() {
+  if (state.currentTurn === 'ai1') state.currentTurn = 'ai2';
+  else if (state.currentTurn === 'ai2') state.currentTurn = 'player';
+  else state.currentTurn = 'ai1';
+
+  if (state.passCount >= 2) {
+    state.lastPlay = null;
+    state.passCount = 0;
+    renderLastPlay();
+  }
+
+  if (state.currentTurn === 'player') {
+    document.getElementById('message').textContent = '轮到你了';
+    enableMyTurn(true);
+  } else {
+    setTimeout(aiPlay, 900);
+  }
+}
+
+function findPlayable(hand, lastPlay, ctx) {
+  if (!lastPlay || lastPlay.pass) {
+    const combo = findBestCombo(hand);
+    if (combo) return combo;
+
+    let minIdx = 0;
+    for (let i = 1; i < hand.length; i++) {
+      const v = cardValue(hand[i]);
+      const curV = cardValue(hand[minIdx]);
+      if (v < curV && v < 15) minIdx = i;
+      else if (curV >= 15 && v < curV) minIdx = i;
+    }
+    return { indices: [minIdx], play: { type: 'single', value: cardValue(hand[minIdx]) } };
+  }
+
+  const needType = lastPlay.type;
+  const needValue = lastPlay.value;
+
+  if (needType === 'single') {
+    const useBig = ctx.mustBlock;
+    let best = -1;
+    for (let i = 0; i < hand.length; i++) {
+      const v = cardValue(hand[i]);
+      if (v > needValue) {
+        if (best === -1 || (useBig ? v > cardValue(hand[best]) : v < cardValue(hand[best]))) best = i;
+      }
+    }
+    if (best >= 0) return { indices: [best], play: { type: 'single', value: cardValue(hand[best]) } };
+  }
+
+  if (needType === 'pair') {
+    for (let i = 0; i < hand.length; i++) {
+      for (let j = i+1; j < hand.length; j++) {
+        if (hand[i].rank === hand[j].rank) {
+          const v = cardValue(hand[i]);
+          if (v > needValue && v < 15) {
+            return { indices: [i,j], play: { type: 'pair', value: v } };
+          }
+        }
+      }
+    }
+  }
+
+  if (needType === 'triple') {
+    for (let i = 0; i < hand.length; i++) {
+      for (let j = i+1; j < hand.length; j++) {
+        for (let k = j+1; k < hand.length; k++) {
+          if (hand[i].rank === hand[j].rank && hand[j].rank === hand[k].rank &&
+              cardValue(hand[i]) > needValue) {
+            return { indices: [i,j,k], play: { type: 'triple', value: cardValue(hand[i]) } };
+          }
+        }
+      }
+    }
+  }
+
+  if (needType !== 'bomb' && needType !== 'rocket') {
+    for (let i = 0; i < hand.length; i++) {
+      for (let j = i+1; j < hand.length; j++) {
+        for (let k = j+1; k < hand.length; k++) {
+          for (let l = k+1; l < hand.length; l++) {
+            if (hand[i].rank === hand[j].rank && hand[j].rank === hand[k].rank && hand[k].rank === hand[l].rank) {
+              if (ctx.mustBlock || hand.length <= 6) {
+                return { indices: [i,j,k,l], play: { type: 'bomb', value: cardValue(hand[i]) } };
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const smallJoker = hand.findIndex(c => c.rank === '小王');
+  const bigJoker = hand.findIndex(c => c.rank === '大王');
+  if (smallJoker >= 0 && bigJoker >= 0 && ctx.mustBlock) {
+    return { indices: [smallJoker, bigJoker], play: { type: 'rocket', value: 100 } };
+  }
+
+  return null;
+}
+
+function findBestCombo(hand) {
+  const counts = {};
+  hand.forEach((c, i) => {
+    const v = cardValue(c);
+    if (v < 15) {
+      counts[v] = counts[v] || [];
+      counts[v].push(i);
+    }
+  });
+  const keys = Object.keys(counts).map(Number).sort((a,b) => a-b);
+
+  let bestStraight = null;
+  for (let start = 0; start < keys.length; start++) {
+    let end = start;
+    while (end + 1 < keys.length && keys[end+1] === keys[end] + 1) end++;
+    const len = end - start + 1;
+    if (len >= 5) {
+      if (!bestStraight || len > bestStraight.length) {
+        bestStraight = { keys: keys.slice(start, end+1), length: len };
+      }
+    }
+  }
+  if (bestStraight) {
+    const indices = [];
+    bestStraight.keys.forEach(k => indices.push(counts[k][0]));
+    return {
+      indices,
+      play: { type: 'straight', value: bestStraight.keys[bestStraight.keys.length-1], length: bestStraight.length }
+    };
+  }
+
+  const pairKeys = keys.filter(k => counts[k].length >= 2);
+  let bestPair = null;
+  for (let start = 0; start < pairKeys.length; start++) {
+    let end = start;
+    while (end + 1 < pairKeys.length && pairKeys[end+1] === pairKeys[end] + 1) end++;
+    const len = end - start + 1;
+    if (len >= 3) {
+      if (!bestPair || len > bestPair.length) {
+        bestPair = { keys: pairKeys.slice(start, end+1), length: len };
+      }
+    }
+  }
+  if (bestPair) {
+    const indices = [];
+    bestPair.keys.forEach(k => indices.push(counts[k][0], counts[k][1]));
+    return {
+      indices,
+      play: { type: 'straight_pair', value: bestPair.keys[bestPair.keys.length-1], length: bestPair.length }
+    };
+  }
+
+  return null;
+}
+
+// ==================== 结算 ====================
+function endGame(msg) {
+  state.playing = false;
+  document.getElementById('message').textContent = msg;
+  document.getElementById('btn-pass').disabled = true;
+  document.getElementById('btn-play').disabled = true;
+  document.getElementById('btn-hint').disabled = true;
+  const btnStart = document.getElementById('btn-start');
+  btnStart.style.display = 'block';
+  btnStart.textContent = '再来一局';
+  btnStart.onclick = startGame;
+  btnStart.style.flex = '2';
+}
+
+// ==================== 启动 ====================
+function boot() {
+  initLogin();
+
+  document.getElementById('btn-play').onclick = playSelected;
+  document.getElementById('btn-pass').onclick = passTurn;
+  document.getElementById('btn-hint').onclick = hint;
+  document.getElementById('btn-bid-yes').onclick = () => resolveBid(true);
+  document.getElementById('btn-bid-no').onclick = () => resolveBid(false);
+  document.getElementById('btn-start').onclick = startGame;
+
+  const saved = localStorage.getItem('ddz_user');
+  if (saved) {
+    state.user = JSON.parse(saved);
+    enterGame();
+  }
+
+  document.getElementById('btn-logout').onclick = () => {
+    if (!confirm('确定退出？')) return;
+    localStorage.removeItem('ddz_user');
+    location.reload();
+  };
+}
+
+boot();
+</script>
+</body>
+</html>
